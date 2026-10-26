@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#101719">
+  <meta name="description" content="A private, evidence-led paper investment research workspace.">
+  <title>Axiom — Research Desk</title>
+  <link rel="icon" href="/icon.svg" type="image/svg+xml">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="stylesheet" href="/style.css">
+  <script src="/app.js" defer></script>
+</head>
+<body>
+  <section id="login" class="login-shell" hidden>
+    <div class="login-story"><div class="wordmark"><span class="brand-mark">A</span> AXIOM <span class="wordmark-sub">RESEARCH DESK</span></div><div><p class="eyebrow">A CLEARER WAY TO THINK</p><h1>Evidence before<br><em>conviction.</em></h1><p class="lead">Keep your portfolio, investment theses and decisions in one considered workspace.</p><div class="login-principles"><span>01 / Understand the evidence</span><span>02 / Know your exposure</span><span>03 / Record the decision</span></div></div><p class="muted">Paper research foundation · No live feeds or order execution</p></div>
+    <div class="login-panel"><div class="login-card"><p class="eyebrow">YOUR PRIVATE WORKSPACE</p><h2>Welcome back.</h2><p class="muted">Sign in with your workspace password.</p><form id="login-form"><label for="password">Workspace password</label><input id="password" name="password" type="password" autocomplete="current-password" required maxlength="1024"><p id="login-error" class="form-error" role="alert"></p><button type="submit" class="button primary full">Open research desk <span aria-hidden="true">↗</span></button></form><p class="fine-print">Single-owner access. Records are stored on your server.</p></div></div>
+  </section>
+  <div id="application" class="app-shell" hidden>
+    <aside class="sidebar"><a href="#desk" class="wordmark"><span class="brand-mark">A</span><span>AXIOM<small>RESEARCH DESK</small></span></a><p class="nav-caption">WORKSPACE</p><nav id="navigation" aria-label="Main navigation"></nav><div class="sidebar-bottom"><div class="mode-indicator"><span class="status-dot"></span> Paper workspace</div><p>Evidence-led decisions.<br>Execution is disabled.</p><button id="sign-out" class="quiet">Sign out ↗</button></div></aside>
+    <div class="main-shell"><header class="topbar"><span class="breadcrumb">WORKSPACE <span>/</span> <strong id="page-name">Decision desk</strong></span><div class="topbar-actions"><span class="connection"><span class="status-dot"></span> Manual records</span><button id="refresh" class="button small">↻ Refresh</button></div></header><div id="example-banner" class="example-banner" hidden><span>EXAMPLE WORKSPACE · All symbols, values and narratives are fictional.</span><button id="clear-examples" class="quiet">Clear examples ↗</button></div><main id="content" tabindex="-1"></main><footer class="footer"><span>AXIOM / INVESTMENT INTELLIGENCE</span><span>Times shown in Auckland · Paper records, not live investment signals</span></footer></div>
+  </div>
+  <dialog id="modal" aria-labelledby="modal-title"><div class="modal-top"><div><p class="eyebrow">RESEARCH WORKSPACE</p><h2 id="modal-title"></h2></div><button id="close-modal" class="icon-button" aria-label="Close dialog">×</button></div><div id="modal-content"></div></dialog>
+  <div id="toast" class="toast" role="status" hidden></div>
+</body>
+</html>

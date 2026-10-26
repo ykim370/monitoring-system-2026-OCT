@@ -1,0 +1,13 @@
+{
+  "name": "axiom-research-desk",
+  "version": "0.1.0",
+  "private": true,
+  "description": "DOM workflow tests for the paper research desk; Node is not needed at runtime.",
+  "scripts": {
+    "test": "node --test tests/ui.test.cjs",
+    "check": "node --check app/static/app.js"
+  },
+  "devDependencies": {
+    "jsdom": "^30.1.3"
+  }
+}

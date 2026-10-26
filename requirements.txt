@@ -1,0 +1,2 @@
+# Production WSGI server only. Application and test suite use the standard library.
+gunicorn==26.2.0
