@@ -93,3 +93,7 @@ Read [architecture and research roadmap](docs/architecture.md), [API contract](d
 Next: point-in-time provider adapters and caching → one predeclared strategy with realistic baselines → expectations/relationship features evaluated through ablation → forward paper evaluation and attribution → separately authorized broker integration.
 
 Complexity earns its place through measured incremental usefulness. A working website does not establish predictive skill. Stops and configured limits cannot guarantee a maximum drawdown or prevent losses during price gaps.
+
+## Sector radar
+
+Open the **Sector radar** tab in the private app. It checks the broad market before evaluating the eleven sector ETF proxies and separates today's US session from the next 2–5 sessions. A conditional bullish outlook needs three sourced evidence families and no blocking market/event risk. Connect an entitled Alpha Vantage key in the private form; macro/news review and catalyst extraction currently remain owner-supplied. No key belongs in GitHub or chat. See [the implementation and limitations](hosted/SECTOR_RADAR.md).

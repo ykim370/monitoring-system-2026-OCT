@@ -19,3 +19,7 @@ Financial comparisons use 8-place fixed-point BigInt arithmetic. Tests cover all
 Schema and migrations are in db/ and drizzle/. Request handlers never create schema. Cloud and local preview databases are separate. Current workspace state has a 1.5 MB limit; export before reaching it. Audit history is separate. This model supports a single research desk, not high-volume institutional ingestion.
 
 Publish through the maintained Sites workflow. Do not deploy the Python entrypoint to a Worker. Never commit database files, tokens, local preview state or environment files.
+
+## Sector radar
+
+See [SECTOR_RADAR.md](SECTOR_RADAR.md). A licensed feed can now be connected securely in the app. Three-family outlooks require market support and reviewed material evidence; macro/news research and notifications remain unconnected.

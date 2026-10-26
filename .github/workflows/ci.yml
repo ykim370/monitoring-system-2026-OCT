@@ -26,4 +26,5 @@ jobs:
       - run: node --check app/static/app.js
       - run: npm test
       - run: gunicorn --version
-      - run: node --test hosted/tests/domain.test.mjs
+      - run: node --test hosted/tests/domain.test.mjs hosted/tests/sector-radar.test.mjs
+      - run: node --test hosted/tests/radar-ui.test.cjs
