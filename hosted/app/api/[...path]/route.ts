@@ -21,7 +21,7 @@ async function handle(req:Request,context:{params:Promise<{path:string[]}>}){
    const history=await db.prepare('SELECT id,payload FROM audit_events WHERE owner=? ORDER BY id DESC LIMIT 100').bind(user.userId).all<{id:number,payload:string}>();
    const audit=history.results.flatMap(row=>JSON.parse(row.payload).map((event:Record<string,unknown>,i:number)=>({...event,sequence:row.id*10000+i})).reverse()).slice(0,100);
    const feed=await db.prepare('SELECT encrypted_secret IS NOT NULL AS connected FROM radar_connections WHERE owner=?').bind(user.userId).first<{connected:number}>();
-   return json({...state,summary:portfolio(state.positions,state.settings),audit,generated_at:new Date().toISOString(),capabilities:{mode:'paper',feeds_connected:!!feed?.connected,forecasting_enabled:false,execution_enabled:false,monitoring_scope:'Manual records and deterministic paper risk checks'},storage:'cloud'});
+   return json({...state,summary:portfolio(state.positions,state.settings),audit,generated_at:new Date().toISOString(),capabilities:{mode:'paper',feeds_connected:!!feed?.connected||!!env.ALPHA_VANTAGE_API_KEY,forecasting_enabled:false,execution_enabled:false,monitoring_scope:'Manual records and deterministic paper risk checks'},storage:'cloud'});
   }
   if(!['POST','PATCH','DELETE'].includes(req.method))throw new Invalid('Not found.',404);
   if(req.headers.get('Origin')!==new URL(req.url).origin||req.headers.get('X-Workspace-Intent')!=='write')throw new Invalid('Write requests require the same origin.',403);

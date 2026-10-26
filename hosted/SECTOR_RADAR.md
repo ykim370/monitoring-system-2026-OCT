@@ -28,3 +28,9 @@ Run the domain and sector-radar Node suites, TypeScript checking and the UI work
 
 Sources: https://www.alphavantage.co/documentation/ and https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm .
 
+
+## Managed key and daily-only fallback
+
+A key supplied to the app owner can be configured as the secret runtime variable ALPHA_VANTAGE_API_KEY. It is never exposed by API responses. The signed-in owner does not need to re-enter it in the form. Opening the workspace refreshes the cached feed when the five-minute lease allows.
+
+If realtime access returns an entitlement error, demonstration payload or unsupported response, all realtime quotes are discarded. Genuine adjusted daily history can still power the multi-day research path. Daily closes never fill intraday quote slots. A response with neither usable SPY history nor an actual SPY quote is rejected. Macro reviews and material catalysts remain required.

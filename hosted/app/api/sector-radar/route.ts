@@ -24,11 +24,14 @@ async function handle(req:Request){try{
    const changed=await db.prepare("INSERT INTO radar_connections(owner,encrypted_secret,snapshot,context,last_refresh,revision,updated_at) VALUES(?,?,?,'{}',?,1,?) ON CONFLICT(owner) DO UPDATE SET encrypted_secret=excluded.encrypted_secret,snapshot=excluded.snapshot,last_refresh=excluded.last_refresh,revision=radar_connections.revision+1,updated_at=excluded.updated_at WHERE radar_connections.encrypted_secret IS NULL").bind(user.userId,encrypted,JSON.stringify(snapshot),Date.now(),new Date().toISOString()).run();
    if(changed.meta.changes!==1)throw new Invalid('Connection changed on another device. Refresh.',409);
   }else if(req.method==='POST'&&data.action==='refresh'){
-   if(!row?.encrypted_secret)throw new Invalid('Connect your Alpha Vantage market-data key first.',409);
+   if(!row?.encrypted_secret&&!env.ALPHA_VANTAGE_API_KEY)throw new Invalid('Connect your Alpha Vantage market-data key first.',409);
+   if(!row){await db.prepare("INSERT OR IGNORE INTO radar_connections(owner,context,last_refresh,revision,updated_at) VALUES(?,'{}',0,1,?)").bind(user.userId,new Date().toISOString()).run();row=await db.prepare('SELECT encrypted_secret,snapshot,context,last_refresh,revision FROM radar_connections WHERE owner=?').bind(user.userId).first<Row>();}
+   if(!row)throw new Invalid('The data connection is unavailable.',503);
    const started=Date.now(),lease=await db.prepare('UPDATE radar_connections SET last_refresh=? WHERE owner=? AND last_refresh<?').bind(started,user.userId,started-300000).run();
-   if(lease.meta.changes!==1)throw new Invalid('A refresh is already running or the five-minute cache is still valid. Use the cached report.',429);
-   const key=await decryptAPIKey(row.encrypted_secret,env.DATA_ENCRYPTION_KEY,user.userId),snapshot=await fetchSnapshot(key,row.snapshot?JSON.parse(row.snapshot):{});
-   const updated=await db.prepare('UPDATE radar_connections SET snapshot=?,updated_at=? WHERE owner=? AND encrypted_secret=? AND last_refresh=?').bind(JSON.stringify(snapshot),new Date().toISOString(),user.userId,row.encrypted_secret,started).run();
+   if(lease.meta.changes!==1)throw new Invalid('Refresh requests are limited to once every five minutes. Cached source timestamps remain visible.',429);
+   const key=row.encrypted_secret?await decryptAPIKey(row.encrypted_secret,env.DATA_ENCRYPTION_KEY,user.userId):env.ALPHA_VANTAGE_API_KEY;
+   const snapshot=await fetchSnapshot(key,row.snapshot?JSON.parse(row.snapshot):{});
+   const updated=await db.prepare('UPDATE radar_connections SET snapshot=?,updated_at=? WHERE owner=? AND encrypted_secret IS ? AND last_refresh=?').bind(JSON.stringify(snapshot),new Date().toISOString(),user.userId,row.encrypted_secret,started).run();
    if(updated.meta.changes!==1)throw new Invalid('Connection changed during refresh. Refresh the page.',409);
   }else if(req.method==='POST'&&data.action==='context'){
    const context=validateContext(data.context);
@@ -36,12 +39,14 @@ async function handle(req:Request){try{
    if(!row){const inserted=await db.prepare('INSERT OR IGNORE INTO radar_connections(owner,context,last_refresh,revision,updated_at) VALUES(?,?,0,1,?)').bind(user.userId,JSON.stringify(context),new Date().toISOString()).run();if(inserted.meta.changes!==1)throw new Invalid('Context changed. Refresh.',409);}
    else{const updated=await db.prepare('UPDATE radar_connections SET context=?,revision=revision+1,updated_at=? WHERE owner=? AND revision=?').bind(JSON.stringify(context),new Date().toISOString(),user.userId,row.revision).run();if(updated.meta.changes!==1)throw new Invalid('Context changed. Refresh.',409);}
   }else if(req.method==='DELETE'){
+   if(!row?.encrypted_secret&&env.ALPHA_VANTAGE_API_KEY)throw new Invalid('This feed uses a managed server secret. Remove it through server settings to disconnect.',409);
    if(data.confirmation!=='DISCONNECT')throw new Invalid('Type DISCONNECT to remove the saved API credential.');
    await db.prepare('UPDATE radar_connections SET encrypted_secret=NULL,snapshot=NULL,last_refresh=0,revision=revision+1,updated_at=? WHERE owner=?').bind(new Date().toISOString(),user.userId).run();
   }else throw new Invalid('Unknown operation.',404);
   row=await db.prepare('SELECT encrypted_secret,snapshot,context,last_refresh,revision FROM radar_connections WHERE owner=?').bind(user.userId).first<Row>();
  }
  const snapshot=row?.snapshot?JSON.parse(row.snapshot):null,context=row?.context?JSON.parse(row.context):{};
- return json({connected:!!row?.encrypted_secret,revision:row?.revision??0,last_refresh:row?.last_refresh??null,context,report:radar(snapshot,context),history_errors:snapshot?.history_errors??[],provider:!!row?.encrypted_secret?'Alpha Vantage':null,setup_required:!row?.encrypted_secret,automatic_notifications:false});
+ const hasKey=!!row?.encrypted_secret||!!env.ALPHA_VANTAGE_API_KEY;
+ return json({connected:hasKey,managed_key:!row?.encrypted_secret&&!!env.ALPHA_VANTAGE_API_KEY,refresh_due:hasKey&&Date.now()-(row?.last_refresh??0)>=300000,data_mode:snapshot?.data_mode??'configured',realtime_status:snapshot?.realtime_status??'not_checked',feed_notice:snapshot?.realtime_error??null,history_as_of:snapshot?.history?.SPY?.[0]?.date??null,revision:row?.revision??0,last_refresh:row?.last_refresh??null,context,report:radar(snapshot,context),history_errors:snapshot?.history_errors??[],provider:hasKey?'Alpha Vantage':null,setup_required:!hasKey,automatic_notifications:false});
  }catch(error){if(error instanceof Invalid)return json({error:error.message},error.status);return json({error:'The radar could not complete this request. Existing records were retained.'},500);}}
 export {handle as GET,handle as POST,handle as DELETE};
