@@ -18,6 +18,12 @@ A private, responsive investment research workspace. This is the first operation
 - Responsive phone/MacBook interface and a home-screen manifest. Push and offline access are not implemented.
 - Automated backend, HTTP and DOM workflow checks with GitHub Actions CI.
 
+## Open the private hosted app
+
+[Open Axiom Research Desk](https://axiom-research-desk.muddy-mite-5466.chatgpt.site)
+
+Choose **Continue with ChatGPT** and use the account that owns this Site. The hosted version uses ChatGPT sign-in and cloud storage; it does not require the local Python server or a separate workspace password. Its complete source is in [hosted/](hosted/README.md). It remains a paper research workspace with manual records.
+
 ## Run locally — Python 3.12+
 
 The application and tests use the Python standard library. No package installation is needed for local development.
