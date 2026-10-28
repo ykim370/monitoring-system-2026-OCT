@@ -13,7 +13,7 @@ export async function fetchSnapshot(key,previous={},fetcher=fetch){
  catch{snapshot.realtime_error='Genuine realtime quotes were not returned. Intraday outlooks remain blocked; completed daily history is used when available.';}
  const historySymbols=['SPY','QQQ','RSP','IWM',...SECTORS.map(s=>s.symbol)];
  if(snapshot.history_session!==completedSessionDate()||!historySymbols.every(symbol=>(snapshot.history[symbol]??[]).some(p=>p.date===completedSessionDate()))){
-  const symbols=historySymbols;snapshot.history={};snapshot.history_errors=[];
+  const symbols=historySymbols;snapshot.history={...snapshot.history};snapshot.history_errors=[];
   for(let i=0;i<symbols.length;i+=3){await Promise.all(symbols.slice(i,i+3).map(async symbol=>{try{snapshot.history[symbol]=parseHistory(await query(key,{function:'TIME_SERIES_DAILY_ADJUSTED',symbol,outputsize:'compact'},fetcher));}catch{snapshot.history_errors.push(`${symbol}: adjusted daily history unavailable; few-day outlook remains unconfirmed.`);}}));}
   snapshot.history_session=completedSessionDate();snapshot.history_fetched_at=new Date().toISOString();
  }

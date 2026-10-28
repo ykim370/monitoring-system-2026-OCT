@@ -22,3 +22,4 @@ test('completed cached histories avoid repeated history requests',async()=>{
  const result=await fetchSnapshot('SYNTHETIC_FIXTURE_KEY',{history,history_session:completedSessionDate()},async()=>{calls++;return {ok:true,json:async()=>({Information:'Realtime unavailable'})};});
  assert.equal(calls,1);assert.equal(result.data_mode,'daily_only');assert.deepEqual(result.history,history);
 });
+test('a failed refresh retains dated history for descriptive rotation',async()=>{const old=[{date:'2026-01-02',close:100},{date:'2025-12-31',close:99}];const result=await fetchSnapshot('SYNTHETIC_FIXTURE_KEY',{history:{SPY:old,XLK:old}},async()=>({ok:true,json:async()=>({Information:'Rate limited'})}));assert.deepEqual(result.history.XLK,old);assert.ok(result.history_errors.length);assert.equal(result.data_mode,'daily_only');});
