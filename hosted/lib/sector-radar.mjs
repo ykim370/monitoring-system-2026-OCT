@@ -31,11 +31,13 @@ function calendar(context,session,at){const rows=[...OFFICIAL_EVENTS,...(context
 // Descriptive rotation is independent of the trade qualification gates.
 export function sectorRanking(snapshot,at=Date.now()){
  const target=completedSessionDate(at),session=usSession(at);
- const clean=symbol=>(snapshot?.history?.[symbol]??[]).filter(p=>p.date<=target&&Number.isFinite(p.close)&&p.close>0).slice().sort((a,b)=>b.date.localeCompare(a.date));
+ const rankingHistory=snapshot?.rotation_basis==='unadjusted_close'?snapshot.rotation_history:snapshot?.history;
+ const clean=symbol=>(rankingHistory?.[symbol]??[]).filter(p=>p.date<=target&&Number.isFinite(p.close)&&p.close>0).slice().sort((a,b)=>b.date.localeCompare(a.date));
  const spyHistory=clean('SPY'),date=spyHistory[0]?.date??null;
  const histories=Object.fromEntries(SECTORS.map(s=>[s.symbol,clean(s.symbol)]));
  const returns=(h,period,offset=0)=>{const start=h.findIndex(p=>p.date===date),i=start+offset;
   if(start<0||!spyHistory[offset+period]||!h[i+period]||!Array.from({length:period+1},(_,j)=>h[i+j]?.date===spyHistory[offset+j]?.date).every(Boolean))return null;
+  if(snapshot?.rotation_basis==='unadjusted_close'&&Array.from({length:period},(_,j)=>Math.abs(h[i+j].close/h[i+j+1].close-1)>.4).some(Boolean))return null;
   return (h[i].close/h[i+period].close-1)*100;
  };
  const liveSymbols=['SPY',...SECTORS.map(s=>s.symbol)],quotes=liveSymbols.map(s=>latest(snapshot,s,at));
@@ -44,7 +46,8 @@ export function sectorRanking(snapshot,at=Date.now()){
  const rows=SECTORS.map(sector=>{const history=histories[sector.symbol],aligned=!!date&&history[0]?.date===date;
   const one=live?snapshot.quotes[sector.symbol].change_pct:returns(history,1),benchmark=live?snapshot.quotes.SPY.change_pct:returns(spyHistory,1);
   const ret5=returns(history,5),ret20=returns(history,20),spy5=returns(spyHistory,5),spy20=returns(spyHistory,20);
-  const sma20=aligned&&history.length>=20&&spyHistory.length>=20&&history.slice(0,20).every((p,i)=>p.date===spyHistory[i].date)?history.slice(0,20).reduce((sum,p)=>sum+p.close,0)/20:null;
+  const splitSafe=snapshot?.rotation_basis!=='unadjusted_close'||history.slice(0,19).every((p,i)=>history[i+1]&&Math.abs(p.close/history[i+1].close-1)<=.4);
+  const sma20=splitSafe&&aligned&&history.length>=20&&spyHistory.length>=20&&history.slice(0,20).every((p,i)=>p.date===spyHistory[i].date)?history.slice(0,20).reduce((sum,p)=>sum+p.close,0)/20:null;
   return {...sector,returns:{1:one,5:ret5,20:ret20},relative:{1:one!==null&&benchmark!==null?one-benchmark:null,5:ret5!==null&&spy5!==null?ret5-spy5:null,20:ret20!==null&&spy20!==null?ret20-spy20:null},prior_return:returns(history,1,1),above_sma20:sma20===null?null:history[0].close>sma20,daily_as_of:aligned?date:null};
  });
  // Equal returns share a competition rank; symbol only breaks display order.
@@ -55,7 +58,7 @@ export function sectorRanking(snapshot,at=Date.now()){
  const market=['SPY','QQQ','RSP','IWM'].map(symbol=>{const h=clean(symbol);return {symbol,change_pct:live?latest(snapshot,symbol,at)?.change_pct??null:returns(h,1)};});
  const advancing=rows.filter(r=>r.returns[1]!==null&&r.returns[1]>0).length,coverage=Object.keys(ranks[1]).length;
  const spy=market[0].change_pct,backdrop=spy===null?'Data unavailable':spy<0&&advancing<=3?'Broad decline':spy>0&&advancing>=8?'Broad advance':'Mixed rotation';
- return {mode:live?'intraday':'completed_session',as_of:asOf,daily_as_of:date,expected_session:target,stale:!live&&!!date&&date!==target,coverage,advancing,backdrop,market,rows,source_url:'https://www.alphavantage.co/documentation/#dailyadj',quote_source_url:source,method:'Rank 1 is the highest observed return over the selected period. Same-period excess return versus SPY is shown separately. Ranks describe ETF proxy performance, not a forecast or trade recommendation. Rank change compares completed daily sessions only when all 11 sectors have comparable data.'};
+ return {price_basis:snapshot?.rotation_basis??'adjusted_close',mode:live?'intraday':'completed_session',as_of:asOf,daily_as_of:date,expected_session:target,stale:!live&&!!date&&date!==target,coverage,advancing,backdrop,market,rows,source_url:snapshot?.rotation_basis==='unadjusted_close'?'https://www.alphavantage.co/documentation/#daily':'https://www.alphavantage.co/documentation/#dailyadj',quote_source_url:source,method:'Rank 1 is the highest observed return over the selected period. Same-period excess return versus SPY is shown separately. Ranks describe ETF proxy performance, not a forecast or trade recommendation. Rank change compares completed daily sessions only when all 11 sectors have comparable data.'};
 }
 
 export function radar(snapshot,context={},at=Date.now()){

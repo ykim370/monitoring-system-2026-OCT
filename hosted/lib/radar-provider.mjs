@@ -11,13 +11,21 @@ export async function fetchSnapshot(key,previous={},fetcher=fetch){
  const snapshot={quotes:{},history:previous.history??{},history_session:previous.history_session??null,history_fetched_at:previous.history_fetched_at??null,history_errors:previous.history_errors??[],fetched_at:new Date().toISOString(),provider:'Alpha Vantage',realtime_status:'unavailable',realtime_error:null,timestamp_timezone_assumption:'America/New_York when the provider omits an explicit offset'};
  try{snapshot.quotes=parseBulk(await query(key,{function:'REALTIME_BULK_QUOTES',symbol:SYMBOLS.join(',')},fetcher));snapshot.realtime_status='verified_response';}
  catch(error){snapshot.realtime_error=`Realtime unavailable: ${error instanceof Invalid?error.message:'Request failed.'} Completed history is used when available.`;}
- const historySymbols=['SPY','QQQ','RSP','IWM',...SECTORS.map(s=>s.symbol)];
- if(snapshot.history_session!==completedSessionDate()||!historySymbols.every(symbol=>(snapshot.history[symbol]??[]).some(p=>p.date===completedSessionDate()))){
-  const symbols=historySymbols;snapshot.history={...snapshot.history};snapshot.history_errors=[];
-  for(let i=0;i<symbols.length;i+=3){await Promise.all(symbols.slice(i,i+3).map(async symbol=>{try{snapshot.history[symbol]=parseHistory(await query(key,{function:'TIME_SERIES_DAILY_ADJUSTED',symbol,outputsize:'compact'},fetcher));}catch(error){snapshot.history_errors.push(`${symbol}: ${error instanceof Invalid?error.message:'Adjusted daily history unavailable.'}`);}}));}
-  snapshot.history_session=completedSessionDate();snapshot.history_fetched_at=new Date().toISOString();
+ const historySymbols=['SPY','QQQ','RSP','IWM',...SECTORS.map(s=>s.symbol)],target=completedSessionDate();
+ const current=h=>historySymbols.every(symbol=>(h?.[symbol]??[]).some(p=>p.date===target));
+ snapshot.rotation_history=previous.rotation_history??{};snapshot.rotation_basis=previous.rotation_basis??'adjusted_close';
+ if(!current(snapshot.history)&&!current(snapshot.rotation_history)){
+  snapshot.history={...snapshot.history};snapshot.rotation_history={...snapshot.rotation_history};snapshot.history_errors=[];
+  let adjusted=true;
+  try{snapshot.history.SPY=parseHistory(await query(key,{function:'TIME_SERIES_DAILY_ADJUSTED',symbol:'SPY',outputsize:'compact'},fetcher));}
+  catch(error){adjusted=false;snapshot.history_errors.push(`Adjusted history unavailable: ${error instanceof Invalid?error.message:'Request failed.'}`);}
+  const destination=adjusted?snapshot.history:snapshot.rotation_history;
+  const symbols=adjusted?historySymbols.filter(s=>s!=='SPY'):historySymbols;
+  for(let i=0;i<symbols.length;i+=3){await Promise.all(symbols.slice(i,i+3).map(async symbol=>{try{const payload=await query(key,{function:adjusted?'TIME_SERIES_DAILY_ADJUSTED':'TIME_SERIES_DAILY',symbol,outputsize:'compact'},fetcher);destination[symbol]=adjusted?parseHistory(payload):parseDailyPrices(payload);}catch(error){snapshot.history_errors.push(`${symbol}: ${error instanceof Invalid?error.message:'Daily history unavailable.'}`);}}));}
+  snapshot.rotation_basis=adjusted?'adjusted_close':'unadjusted_close';
+  snapshot.history_session=target;snapshot.history_fetched_at=new Date().toISOString();
  }
- if(!snapshot.quotes.SPY&&!snapshot.history.SPY?.length)throw new Invalid(`No usable market data returned. ${snapshot.history_errors.find(x=>x.startsWith('SPY:'))||snapshot.realtime_error}`,422);
+ if(!snapshot.quotes.SPY&&!snapshot.history.SPY?.length&&!snapshot.rotation_history.SPY?.length)throw new Invalid(`No usable market data returned. ${snapshot.history_errors.find(x=>x.startsWith('SPY:'))||snapshot.history_errors[0]||snapshot.realtime_error}`,422);
  snapshot.data_mode=snapshot.realtime_status==='verified_response'?'realtime_and_daily':'daily_only';
  return snapshot;
 }
@@ -25,6 +33,8 @@ export async function fetchSnapshot(key,previous={},fetcher=fetch){
 // Shared feed diagnostics: contains no user records, keys or provider payloads.
 export async function probeMarketFeed(key,fetcher=fetch){
  if(!key)return {configured:false,status:'missing_key'};
- const checks=[];for(const symbol of ['SPY','XLK']){try{const bars=parseHistory(await query(key,{function:'TIME_SERIES_DAILY_ADJUSTED',symbol,outputsize:'compact'},fetcher));checks.push({symbol,status:bars.length>=21?'ok':'insufficient_history',bars:bars.length,latest_session:bars[0]?.date??null});}catch(error){checks.push({symbol,status:'failed',error:error instanceof Invalid?error.message:'Provider request failed.'});}}
+ const checks=[];for(const symbol of ['SPY','XLK']){try{const bars=parseDailyPrices(await query(key,{function:'TIME_SERIES_DAILY',symbol,outputsize:'compact'},fetcher));checks.push({symbol,basis:'unadjusted_close',status:bars.length>=21?'ok':'insufficient_history',bars:bars.length,latest_session:bars[0]?.date??null});}catch(error){checks.push({symbol,status:'failed',error:error instanceof Invalid?error.message:'Provider request failed.'});}}
  return {configured:true,status:checks.every(x=>x.status==='ok')?'ok':'failed',checks,checked_at:new Date().toISOString()};
 }
+
+export function parseDailyPrices(payload){const series=payload?.['Time Series (Daily)'];if(!series)throw new Invalid('Standard daily price history unavailable.',422);return Object.entries(series).filter(([date,row])=>/^\d{4}-\d\d-\d\d$/.test(date)&&Number.isFinite(Number(row['4. close']))&&Number(row['4. close'])>0).map(([date,row])=>({date,close:Number(row['4. close'])})).sort((a,b)=>b.date.localeCompare(a.date)).slice(0,80);}
