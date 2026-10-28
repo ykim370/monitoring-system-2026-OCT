@@ -30,7 +30,13 @@ async function handle(req:Request){try{
    const started=Date.now(),lease=await db.prepare('UPDATE radar_connections SET last_refresh=? WHERE owner=? AND last_refresh<?').bind(started,user.userId,started-300000).run();
    if(lease.meta.changes!==1)throw new Invalid('Refresh requests are limited to once every five minutes. Cached source timestamps remain visible.',429);
    const key=row.encrypted_secret?await decryptAPIKey(row.encrypted_secret,env.DATA_ENCRYPTION_KEY,user.userId):env.ALPHA_VANTAGE_API_KEY;
-   const snapshot=await fetchSnapshot(key,row.snapshot?JSON.parse(row.snapshot):{});
+   let snapshot;
+   try{snapshot=await fetchSnapshot(key,row.snapshot?JSON.parse(row.snapshot):{});}
+   catch(error){const message=error instanceof Invalid?error.message:'Market data refresh failed.';
+    const previous=row.snapshot?JSON.parse(row.snapshot):{};
+    await db.prepare('UPDATE radar_connections SET snapshot=?,last_refresh=?,updated_at=? WHERE owner=? AND encrypted_secret IS ? AND last_refresh=?').bind(JSON.stringify({...previous,refresh_error:message,refresh_failed_at:new Date().toISOString()}),started-240000,new Date().toISOString(),user.userId,row.encrypted_secret,started).run();
+    throw error;
+   }
    const updated=await db.prepare('UPDATE radar_connections SET snapshot=?,updated_at=? WHERE owner=? AND encrypted_secret IS ? AND last_refresh=?').bind(JSON.stringify(snapshot),new Date().toISOString(),user.userId,row.encrypted_secret,started).run();
    if(updated.meta.changes!==1)throw new Invalid('Connection changed during refresh. Refresh the page.',409);
   }else if(req.method==='POST'&&data.action==='context'){
@@ -47,6 +53,6 @@ async function handle(req:Request){try{
  }
  const snapshot=row?.snapshot?JSON.parse(row.snapshot):null,context=row?.context?JSON.parse(row.context):{};
  const hasKey=!!row?.encrypted_secret||!!env.ALPHA_VANTAGE_API_KEY;
- return json({connected:hasKey,managed_key:!row?.encrypted_secret&&!!env.ALPHA_VANTAGE_API_KEY,refresh_due:hasKey&&Date.now()-(row?.last_refresh??0)>=300000,data_mode:snapshot?.data_mode??'configured',realtime_status:snapshot?.realtime_status??'not_checked',feed_notice:snapshot?.realtime_error??null,history_as_of:snapshot?.history?.SPY?.[0]?.date??null,revision:row?.revision??0,last_refresh:row?.last_refresh??null,context,report:radar(snapshot,context),history_errors:snapshot?.history_errors??[],provider:hasKey?'Alpha Vantage':null,setup_required:!hasKey,automatic_notifications:false});
+ return json({connected:hasKey,managed_key:!row?.encrypted_secret&&!!env.ALPHA_VANTAGE_API_KEY,refresh_due:hasKey&&Date.now()-(row?.last_refresh??0)>=300000,data_mode:snapshot?.data_mode??'configured',realtime_status:snapshot?.realtime_status??'not_checked',feed_notice:snapshot?.refresh_error??snapshot?.realtime_error??null,feed_error:snapshot?.refresh_error??null,history_as_of:snapshot?.history?.SPY?.[0]?.date??null,revision:row?.revision??0,last_refresh:row?.last_refresh??null,context,report:radar(snapshot,context),history_errors:snapshot?.history_errors??[],provider:hasKey?'Alpha Vantage':null,setup_required:!hasKey,automatic_notifications:false});
  }catch(error){if(error instanceof Invalid)return json({error:error.message},error.status);return json({error:'The radar could not complete this request. Existing records were retained.'},500);}}
 export {handle as GET,handle as POST,handle as DELETE};
